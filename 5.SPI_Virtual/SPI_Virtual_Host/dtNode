@@ -1,0 +1,17 @@
+/* Beaglebone Black has 2 SPI Controllers namely spi0 and spi1 */
+/* We are creating a virtual controller attached to the spi interface
+   called spi2 */
+
+/ {
+        /* SPI Virtual Host Controller Node */
+        spi2:   spi@44E03000 {
+                compatible = "ti, spi_virtual_host";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <0x44E03000 0x400>;
+                ti,spi-num-cs = <2>;
+                ti,hwmods = "spi2";
+                status = "disabled";
+        };
+};
+

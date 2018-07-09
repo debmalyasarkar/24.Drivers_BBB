@@ -1,0 +1,22 @@
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* Declare the i2c_rtc as a child node under the i2c2 node */
+/* An interrupt line is also present in some devices for alarms, but this
+   device does not support it */
+/* I2C Address 0x68 is specified in Device DataSheet */
+/* Connect Pins SDA- P9_Pin20, SCL - P9_Pin19 */
+
+&i2c2 {
+        /* Enable te I2C Host Controller */
+        status = "okay";
+
+        /* I2C RTC Node */
+        i2c_rtc:  i2c_rtc@68
+        {
+                compatible = "i2c_rtc_ds1307";
+                /* I2C Address 0x68 */
+                reg = <0x68>;
+        };
+};
+

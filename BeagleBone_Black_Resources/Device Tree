@@ -1,0 +1,126 @@
+Defining peripherals
+
+It’s likely that you’re reading this because you want to write a Linux driver for your own peripheral. The recommended book for learning the basics is the famous Linux Device Drivers. But before jumping into writing a device driver of your own, allow me to share rule number one for writing drivers for Linux: Never write a device driver for Linux.
+
+Rather, find a well-maintained driver for some other hardware with similar functionality, and hack it. This is not just easier, but you’re likely to avoid problems you’re not even aware of. Copying snippets of code from other drivers will make your own understandable to others, portable, and with a better chance to be accepted into the kernel tree.
+
+So the key is understanding what another driver is doing, and then adjust the parts that are related. In case of doubt, do what everyone else is doing. Creativity and personal style are not helpful.
+
+Now back to the device tree. Let’s look at the segment that was omitted an in part II:
+
+  ps7_axi_interconnect_0: axi@0 {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    compatible = "xlnx,ps7-axi-interconnect-1.00.a", "simple-bus";
+    ranges ;
+    gic: interrupt-controller@f8f01000 {
+      #interrupt-cells = < 3 >;
+      compatible = "arm,cortex-a9-gic";
+      interrupt-controller ;
+      reg = < 0xf8f01000 0x1000  >,< 0xf8f00100 0x100  >;
+    } ;
+    pl310: pl310-controller@f8f02000 {
+      arm,data-latency = < 3 2 2 >;
+      arm,tag-latency = < 2 2 2 >;
+      cache-level = < 2 >;
+      cache-unified ;
+      compatible = "arm,pl310-cache";
+      interrupts = < 0 34 4 >;
+      reg = < 0xf8f02000 0x1000 >;
+    } ;
+
+      [ ... more items ... ]
+
+    xillybus_0: xillybus@50000000 {
+      compatible = "xlnx,xillybus-1.00.a";
+      reg = < 0x50000000 0x1000 >;
+      interrupts = < 0 59 1 >;
+      interrupt-parent = <&gic>;
+      xlnx,max-burst-len = <0x10>;
+      xlnx,native-data-width = <0x20>;
+      xlnx,slv-awidth = <0x20>;
+      xlnx,slv-dwidth = <0x20>;
+      xlnx,use-wstrb = <0x1>;
+    } ;
+  } ;
+
+Only the first two devices from the original file are shown, and also the last one, which we’ll focus on. As mentioned earlier, this is an excerpt from the full DTS file which is available as /boot/devicetree-3.3.0-xillinux-1.0.dts in Xillinux’ file system.
+
+Let’s pay attention to the first entry in the list: It’s the Zynq processor’s interrupt controller. The existence of this entry makes sure that the interrupt controller’s driver is loaded. Note that its label is “gic”. This label will be referenced in every device that uses interrupts.
+
+We are now finally in position to talk about the interesting stuff: How all this works together with the Linux code.
+Relation to the kernel driver
+
+Four things must happen to have our device driver alive and kicking:
+
+    The driver loaded by the kernel when the hardware is present (i.e. declared in the device tree)
+    The driver needs to know the physical addresses allocated to the device
+    The driver needs to know which interrupt(s) the device will trigger, so it can register interrupt handlers
+    Application-specific information needs to be retrieved
+
+The kernel has an API for accessing the device tree directly, but it’s much easier to use the dedicated interface for device drivers, which is highly influenced by the API used for PCI/PCIe drivers. Let’s consider the xillybus_0 entry, which is rather typical for custom logic attached to the AXI bus.
+The label and node name
+
+First, the label (”xillybus”) and entry’s name (”xillybus@50000000″). The label could have been omitted altogether, and the entry’s node name should stick to this format (some-name@address), so that a consistent entry is generated in /sys (/sys/devices/axi.0/50000000.xillybus/ in this case). The data in this device tree entry will appear in /proc/device-tree/axi@0/xillybus@50000000/, but that’s definitely not the way to access it from within the kernel.
+Making the driver autoload
+
+The first assignment in the node, compatible = “xlnx,xillybus-1.00.a” is the most crucial one: It’s the link between the hardware and its driver. When the kernel scans the entries in the bus for devices (i.e. nodes in the device tree under a bus node) it retrieves the “compatible” properties and compares those strings with a list of strings it “knows about”. This happens automatically on two occasions during the boot process:
+
+    When the kernel starts up, it kicks off compiled-in drivers that match “compatible” entries it finds in the device tree.
+    At a later stage (when /lib/modules is available), all kernel modules that match “compatible” entries in the device tree are loaded.
+
+The connection between a kernel driver and the “compatible” entries it should be attached to, is made by a code segment as follows in the driver’s source code:
+
+static struct of_device_id xillybus_of_match[] __devinitdata = {
+  { .compatible = "xlnx,xillybus-1.00.a", },
+  {}
+};
+
+MODULE_DEVICE_TABLE(of, xillybus_of_match);
+
+This hocus-pocus code declares that the current driver matches a certain “compatible” entry, and leaves the rest to the kernel infrastructure. Note that there’s a NULL struct entry in the list: It’s possible to define multiple “compatible” strings, all of which will cause the current driver to load, so this list must be terminated with a NULL ( “{}” in the list, as shown above).
+
+Also, near the bottom of the code, something like this is necessary:
+
+static struct platform_driver xillybus_platform_driver = {
+  .probe = xilly_drv_probe,
+  .remove = xilly_drv_remove,
+  .driver = {
+    .name = "xillybus",
+    .owner = THIS_MODULE,
+    .of_match_table = xillybus_of_match,
+  },
+};
+
+And then platform_driver_register(&xillybus_platform_driver) must be called in the module’s initialization function. This informs the kernel about the function to be called if hardware matching xillybus_of_match has been found, which is xilly_drv_probe() in this case.
+
+To the kernel, the “compatible” string is just a string that needs to be equal (as in strcmp) to what some driver has declared. The “xlnx,” prefix is just a way to keep clear of name clashes.
+
+By the way, a peripheral entry in the device tree may declare several “compatible” strings. Also, it’s possible that more than one driver will be eligible for a certain peripheral entry, in which case they are all probed until one of them returns success on the probing function. Which one is given the opportunity first is not defined.
+
+It’s also possible to require a match with the hardware’s name and type, but this is not used often.
+
+An important thing to note when writing kernel modules, is that the automatic loading mechanism (modprobe, actually) depends on an entry for the “compatible” string in /lib/modules/{kernel version}/modules.ofmap and other definition files in the same directory. The correct way to make this happen for your own module, is to copy the *.ko file to somewhere under the relevant /lib/modules/{kernel version}/kernel/drivers/ directory and go
+
+# depmod -a
+
+on the target platform, with that certain kernel version loaded (or define which kernel version to depmod).
+
+
+The driver can also declare the ID table as a device table to enable autoloading of the module as the device tree is instantiated using the
+MODULE_DEVICE_TABLE Macro
+
+Note
+-----
+/* The above material is taken from Part 3 of the tutorial described below by xillibus */
+
+Bibliography
+-------------
+/* Provides a very good comprehensive tutorial Part 1 to Part 5 */
+http://xillybus.com/tutorials/device-tree-zynq-1
+
+/* Can be used for reference */ 
+https://www.kernel.org/doc/Documentation/devicetree/usage-model.txt
+https://lwn.net/Articles/448502/
+https://elinux.org/Device_Tree_Usage
+

@@ -1,0 +1,47 @@
+/* Beaglebone Black has 2 SPI Controllers namely spi0 and spi1 */
+/* The device used here is ATMEL AT45DB161D 16Mb Data Flash */
+/* This device is connected to the spi0 Interface of the board */
+
+&am33xx_pinmux {
+        /* The spi0 pins are not configured in SPI Mode by default
+           We need to configure them to SPI mode using Pin Muxing */
+        /* Configuring each pin's corresponding register for setting its mode,pullup and other options */
+        /* Can be seen in the SOC Technical Reference Manual */
+        /* am33xx_pinmux is at an address 0x800 which can be seen from am33xx.dtsi file */
+        /* Adding 0x150 to that causes equivalent address to be 0x950 which corresponds to conf_spi0_sclk 
+           register in SOC Technical Reference Manual. Same is true for other pins. */
+        spi0_pins: pinmux_spi0_pins {
+                pinctrl-single,pins = <
+                        0x150 (PIN_INPUT_PULLUP  | MUX_MODE0) /* spi0_sclk, INPUT_PULLUP | MODE0(0x30) */
+                        0x154 (PIN_INPUT_PULLUP  | MUX_MODE0) /* spi0_d0, INPUT_PULLUP | MODE0 (0x30) */
+                        0x158 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* spi0_d1, OUTPUT_PULLUP | MODE0(0x10) */
+                        0x15c (PIN_OUTPUT_PULLUP | MUX_MODE0) /* spi0_cs0, OUTPUT_PULLUP | MODE0(0x10) */
+                >;
+        };
+};
+
+&spi0 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&spi0_pins>;
+
+        status = "okay";
+
+        /* Node for AT45DB161D SPI DataFlash */
+        spi_flash: spi_flash@0 {
+                compatible = "atmel,at45db161d";
+                /* 66 MHz Frequency */
+                spi-max-frequency = <66000000>;
+                /* Chip Select Line 0 */
+                reg = <0x0>;
+                /* 2 MBytes */
+                size = <2097152>;
+                /* Page Size 512 */
+                pagesize = <512>;
+                /* 24 Address Lines for 2 Mbyte or 16 Mbit */
+                address-width = <24>;
+                /* SPI Mode 3 */
+                spi-cpol;
+                spi-cpha;
+        };
+};
+

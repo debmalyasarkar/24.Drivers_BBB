@@ -1,0 +1,23 @@
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* We are creating a virtual i2c slave/client node which is attached to our
+   host controller called i2c3 */
+/* Declare the i2c_vclient as a child node under the i2c3 node */
+/* The properties of pagesize, address and others can be found in the device
+   datasheet */
+
+&i2c3 {
+        /* Enable te I2C Host Controller */
+        status = "okay";
+
+	/* I2C Virtual Client Node */
+	i2c_vclient:  i2c_vclient@77
+	{
+		compatible = "i2c_virtual_client";
+                reg = <0x77>;
+                size = <256>;
+		pagesize = <16>;
+		address-width = <8>;
+	};
+};

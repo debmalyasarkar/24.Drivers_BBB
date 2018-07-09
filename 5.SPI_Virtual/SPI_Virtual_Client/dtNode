@@ -1,0 +1,24 @@
+/* Beaglebone Black has 2 SPI Controllers namely spi0 and spi1 */
+/* We have previously created a virtual controller attached to the 
+   spi interface called spi2 */
+/* Here we are creating a virtual spi slave/client node which is 
+   attached to our spi2 virtual controller interface */
+/* Declare the spi_vclient as a child node under the spi2 node */
+/* The properties of page size, address width and others can be seen
+   in the specific device datasheet */
+
+&spi2 {
+        /* Enable the spi2 host controller */
+	status = "okay";
+
+	/* SPI Virtual Client Node */
+	spi_vclient: spi_vclient@0 {
+		compatible = "spi_virtual_client";
+		spi-max-frequency = <50000>;
+		reg = <0>;
+		size = <256>;
+		pagesize = <16>;
+		address-width = <8>;
+	};
+};
+	

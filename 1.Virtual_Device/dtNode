@@ -1,0 +1,17 @@
+/ {
+        /* Virtual Platform Device Node at Address 0x4800A000 */
+        virtual_device_node@4800A000 {
+                /* Specify the Vendor ID and Device ID */
+                /* Manufacturer and Model for Namespace Identification */
+                compatible = "virtual_vendor,virtual_device";
+                /* No of cells to treat as address in Child Node */
+                #address-cells = <1>;
+                /* No of cells to treat as size in Child Node */
+                #size-cells = <1>;
+                /* Register a 4096bytes Memory Region */
+                reg = <0x4800A000 0x1000>;
+                /* Enable the Device */
+                status = "okay";
+        };
+};
+

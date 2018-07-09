@@ -1,0 +1,240 @@
+/*
+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as 
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+#include "am33xx.dtsi"
+#include "am335x-bone-common.dtsi"
+#include "am335x-boneblack-common.dtsi"
+
+/ {
+	model = "TI AM335x BeagleBone Black";
+	compatible = "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
+};
+
+&cpu0_opp_table {
+	/* 
+	 * All PG 2.0 silicon may not support 1GHz but some of the early
+	 * BeagleBone Blacks have PG 2.0 silicon which is guaranteed
+	 * to support 1GHz OPP so enable it for PG 2.0 on this board.
+	 */
+	oppnitro@1000000000 {
+		opp-supported-hw = <0x06 0x0100>;
+	};
+};
+
+/ {
+	/* Virtual Platform Device Node at Address 0x4800A000 */
+	virtual_device_node@4800A000 {
+ 		/* Specify the Vendor ID and Device ID */
+		/* Manufacturer and Model for Namespace Identification */
+		compatible = "virtual_vendor,virtual_device";
+		/* No of cells to treat as address in Child Node */
+		#address-cells = <1>;
+		/* No of cells to treat as size in Child Node */
+		#size-cells = <1>;
+		/* Register a 4096bytes Memory Region */
+		reg = <0x4800A000 0x1000>;
+		/* Enable the Device */
+		status = "okay";
+        };
+};
+
+/ {
+	/* External LED connected on GPIO Bank0 Pin27 */
+	external_led {
+		compatible = "gpio_extled";
+		gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
+	};
+};
+
+/ {
+        /* External Push Button Connected to GPIO is Configured as Interrupt */
+        external_button {
+                compatible = "gpio_button_intr";
+                gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+        };
+};
+
+/* Beaglebone Black has 2 SPI Controllers namely spi0 and spi1 */
+/* We are creating a virtual controller attached to the spi interface
+   called spi2 */
+
+/ {
+        /* SPI Virtual Host Controller Node */
+        spi2:   spi@44E03000 {
+                compatible = "ti, spi_virtual_host";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <0x44E03000 0x400>;
+                ti,spi-num-cs = <2>;
+                ti,hwmods = "spi2";
+                status = "disabled";
+        };
+};
+
+/* Beaglebone Black has 2 SPI Controllers namely spi0 and spi1 */
+/* We have previously created a virtual controller attached to the 
+   spi interface called spi2 */
+/* Here we are creating a virtual spi slave/client node which is
+   attached to our spi2 virtual controller interface */
+/* Declare the spi_vclient as a child node under the spi2 node */
+/* The properties of page size, address width and others can be seen 
+   in the specific device datasheet */
+
+&spi2 {
+        /* Enable the spi2 host controller */
+        status = "okay";
+
+        /* SPI Virtual Client Node */
+        spi_vclient: spi_vclient@0 {
+                compatible = "spi_virtual_client";
+                spi-max-frequency = <50000>;
+                reg = <0>;
+                size = <256>;
+                pagesize = <16>;
+                address-width = <8>;
+        };
+};
+
+/* Beaglebone Black has 2 SPI Controllers namely spi0 and spi1 */
+/* The device used here is ATMEL AT45DB161D 16Mb Data Flash */
+/* This device is connected to the spi0 Interface of the board */
+
+&am33xx_pinmux {
+        /* The spi0 pins are not configured in SPI Mode by default
+           We need to configure them to SPI mode using Pin Muxing */
+        /* Configuring each pin's corresponding register for setting its mode,pullup and other options */
+        /* Can be seen in the SOC Technical Reference Manual */
+        /* am33xx_pinmux is at an address 0x800 which can be seen from am33xx.dtsi file */
+        /* Adding 0x150 to that causes equivalent address to be 0x950 which corresponds to conf_spi0_sclk 
+           register in SOC Technical Reference Manual. Same is true for other pins. */
+        spi0_pins: pinmux_spi0_pins {
+                pinctrl-single,pins = <
+                        0x150 (PIN_INPUT_PULLUP  | MUX_MODE0) /* spi0_sclk, INPUT_PULLUP | MODE0(0x30) */
+                        0x154 (PIN_INPUT_PULLUP  | MUX_MODE0) /* spi0_d0, INPUT_PULLUP | MODE0 (0x30) */
+                        0x158 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* spi0_d1, OUTPUT_PULLUP | MODE0(0x10) */
+                        0x15c (PIN_OUTPUT_PULLUP | MUX_MODE0) /* spi0_cs0, OUTPUT_PULLUP | MODE0(0x10) */
+                >;
+        };
+};
+
+&spi0 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&spi0_pins>;
+
+        status = "okay";
+
+        /* Node for AT45DB161D SPI DataFlash */
+        spi_flash: spi_flash@0 {
+		compatible = "atmel,at45db161d";
+                /* 66 MHz Frequency */
+		spi-max-frequency = <66000000>;
+                /* Chip Select Line 0 */
+                reg = <0x0>;
+                /* 2 MBytes */
+                size = <2097152>;
+                /* Page Size 512 */
+                pagesize = <512>;
+                /* 24 Address Lines for 2 Mbyte or 16 Mbit */
+                address-width = <24>;
+                /* SPI Mode 3 */
+                spi-cpol;
+                spi-cpha;
+        };
+};
+
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* We are creating a virtual i2c host controller called i2c3 */
+
+/ {
+        /* I2C Virtual Host Controller Node */
+        i2c3:   i2c@4819E000
+        {
+                compatible = "ti, i2c_virtual_host";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                ti,hwmods = "i2c4";
+                reg = <0x4819E000 0x1000>;
+        };
+};
+
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* We are creating a virtual i2c slave/client node which is attached to our /
+   host controller called i2c3 */
+/* Declare the i2c_vclient as a child node under the i2c3 node */
+/* The properties of pagesize, address and others can be found in the device /
+   datasheet */
+
+&i2c3 {
+        /* Enable te I2C Host Controller */
+        status = "okay";
+
+        /* I2C Virtual Client Node */
+        i2c_vclient:  i2c_vclient@77
+        {
+                compatible = "i2c_virtual_client";
+                reg = <0x77>;
+                size = <256>;
+                pagesize = <16>;
+                address-width = <8>;
+        };
+};
+
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* Declare the i2c_eeprom as a child node under the i2c2 node */
+/* The properties of pagesize, address and others can be found in the device /
+   datasheet */
+/* Connect Pins SDA- P9_Pin20, SCL - P9_Pin19 */
+
+&i2c2 {
+        /* Enable te I2C Host Controller */
+        status = "okay";
+
+        /* I2C EEPROM Node */
+        i2c_eeprom:  i2c_eeprom@50
+        {
+                compatible = "i2c_eeprom_at24c32";
+                /* I2C Address 0x50 */
+                reg = <0x50>;
+                /* 4 KiloBytes */
+                size = <4096>;
+                /* 32 Bytes Page Size */
+                pagesize = <32>;
+                /* 12 Bit Required to Access 4K Addresses */
+                address-width = <12>;
+        };
+}; 
+
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* Declare the i2c_rtc as a child node under the i2c2 node */
+/* An interrupt line is also present in some devices for alarms, but this
+   device does not support it */
+/* I2C Address 0x68 is specified in Device DataSheet */
+/* Connect Pins SDA- P9_Pin20, SCL - P9_Pin19 */
+
+&i2c2 {
+        /* Enable te I2C Host Controller */
+        status = "okay";
+
+        /* I2C RTC Node */
+        i2c_rtc:  i2c_rtc@68
+        {
+                compatible = "i2c_rtc_ds1307";
+                /* I2C Address 0x68 */
+                reg = <0x68>;
+        };
+};
+

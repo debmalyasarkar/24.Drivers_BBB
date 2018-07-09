@@ -1,0 +1,7 @@
+/ {
+        /* External LED connected on GPIO Bank0 Pin27 */
+        external_led {
+                compatible = "gpio_extled";
+                gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
+        };      
+};

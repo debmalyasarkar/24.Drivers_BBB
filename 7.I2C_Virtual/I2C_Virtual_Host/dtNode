@@ -1,0 +1,19 @@
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* We are creating a virtual i2c host controller called i2c3 */
+/* The node address is decided after seeing the am33xx.dtsi file to ensure 
+   there are no interferences with the address space of other i2c controllers */
+
+/ {
+	/* I2C Virtual Host Controller Node */
+	i2c3:	i2c@4819E000
+	{
+		compatible = "ti, i2c_virtual_host";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		ti,hwmods = "i2c4";
+		reg = <0x4819E000 0x1000>;
+		status = "disabled";
+	};
+};

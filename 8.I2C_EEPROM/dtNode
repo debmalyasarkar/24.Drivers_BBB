@@ -1,0 +1,27 @@
+/* BeagleBone Black has 3 I2C Controllers namely i2c0, i2c1 and i2c2 */
+/* i2c0 is not projected to pins and it is used for internal devices only */
+/* i2c1 and i2c2 are available in pin headers */
+/* Declare the i2c_eeprom as a child node under the i2c2 node */
+/* The properties of pagesize, address and others can be found in the device /
+   datasheet */
+/* Connect Pins SDA- P9_Pin20, SCL - P9_Pin19 */
+
+&i2c2 {
+        /* Enable te I2C Host Controller */
+        status = "okay";
+
+        /* I2C EEPROM Node */
+        i2c_eeprom:  i2c_eeprom@50
+        {
+                compatible = "i2c_eeprom_at24c32";
+                /* I2C Address 0x50 */
+                reg = <0x50>;
+                /* 4 KiloBytes */
+                size = <4096>;
+                /* 32 Bytes Page Size */
+                pagesize = <32>;
+                /* 12 Bit Required to Access 4K Addresses */
+                address-width = <12>;
+        };
+};
+
